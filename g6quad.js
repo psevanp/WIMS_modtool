@@ -40,6 +40,7 @@
   function angAt(P, i) { var o = P[i], u = unit(o, P[(i + 3) % 4]), v = unit(o, P[(i + 1) % 4]);
     return Math.acos(Math.max(-1, Math.min(1, u.x * v.x + u.y * v.y))) * 180 / Math.PI; }
   function classify(P) {
+    if (!convex(P)) return { isRect: false, isRhombus: false, isSquare: false };
     var s = [dist(P[0], P[1]), dist(P[1], P[2]), dist(P[2], P[3]), dist(P[3], P[0])];
     var isRect = true; for (var i = 0; i < 4; i++) if (Math.abs(angAt(P, i) - 90) > 4) isRect = false;
     var mx = Math.max(s[0], s[1], s[2], s[3]), mn = Math.min(s[0], s[1], s[2], s[3]);
@@ -175,9 +176,14 @@
         pins: function (P) { return [P[2], P[3]]; },
         dragPin: function (s, idx, x, y) {
           if (idx === 0) { var uC = unit(B, { x: x, y: y }), C = { x: B.x + L * uC.x, y: B.y + L * uC.y };
+            if (Math.abs(C.x - B.x) < 13) C = { x: B.x, y: (C.y < B.y) ? B.y - L : B.y + L }; // aimant : angle B = 90 (BC vertical)
             var uD = unit(C, s.D), D = { x: C.x + L * uD.x, y: C.y + L * uD.y }; return { C: C, D: D }; }
-          var uD2 = unit(s.C, { x: x, y: y }), D2 = { x: s.C.x + L * uD2.x, y: s.C.y + L * uD2.y };
-          if (Math.abs(dist(D2, A) - L) < 12) { var snap = circInt(s.C, A, L, D2); if (snap) D2 = snap; }
+          var uD2 = unit(s.C, { x: x, y: y });
+          var cb = unit(s.C, B), p1 = { x: -cb.y, y: cb.x }, p2 = { x: cb.y, y: -cb.x };
+          var best = (uD2.x * p1.x + uD2.y * p1.y >= uD2.x * p2.x + uD2.y * p2.y) ? p1 : p2;
+          if (uD2.x * best.x + uD2.y * best.y > 0.984) uD2 = best; // aimant : angle C = 90 (CD perpendiculaire a CB)
+          var D2 = { x: s.C.x + L * uD2.x, y: s.C.y + L * uD2.y };
+          if (Math.abs(dist(D2, A) - L) < 13) { var snap = circInt(s.C, A, L, D2); if (snap && dist(snap, B) > 16 && dist(snap, s.C) > 16) D2 = snap; } // aimant : 4e cote egal -> losange
           return { C: s.C, D: D2 }; },
         coded: function (P) { return { m: tick(P, 0, 1, GY) + tick(P, 1, 1, GY) + tick(P, 2, 1, GY), l: '' }; }
       };
