@@ -190,11 +190,43 @@
     }
   };
   MODES.rhomb = function (cfg) { cfg.a = cfg.a || 4; cfg.b = cfg.a; return MODES.para(cfg); };
+  // "freeRA" : quadrilatere libre, A fixe, B/C/D deplacables ; aimant qui ramene un
+  // sommet a l'angle droit (cercle de Thales sur ses 2 voisins). Sert a decouvrir que
+  // 3 angles droits en forcent un 4e. Marque verte sur CHAQUE sommet a 90 deg.
+  MODES.freeRA = function (cfg) {
+    var A = { x: 92, y: 216 };
+    function angV(V, P_, Q_) { var u = unit(V, P_), w = unit(V, Q_); return Math.acos(Math.max(-1, Math.min(1, u.x * w.x + u.y * w.y))) * 180 / Math.PI; }
+    return {
+      hint: 'Déplace les <b style="color:#ea7317">trois points orange</b>. Un aimant ramène un sommet quand son angle devient droit : essaie d\'en former trois — que se passe-t-il pour le quatrième&#8239;?',
+      state: { B: { x: 300, y: 206 }, C: { x: 286, y: 74 }, D: { x: 104, y: 96 } },
+      points: function (s) { return [A, s.B, s.C, s.D]; },
+      pins: function (P) { return [P[1], P[2], P[3]]; },
+      dragPin: function (s, idx, x, y) {
+        x = Math.max(24, Math.min(356, x)); y = Math.max(22, Math.min(266, y));
+        var pts = [A, s.B, s.C, s.D], vi = idx + 1, V = { x: x, y: y };
+        var P_ = pts[(vi + 3) % 4], Q_ = pts[(vi + 1) % 4];
+        if (Math.abs(angV(V, P_, Q_) - 90) < 8) { // aimant de Thales : angle en V -> 90
+          var cen = { x: (P_.x + Q_.x) / 2, y: (P_.y + Q_.y) / 2 }, r = dist(P_, Q_) / 2, d = unit(cen, V);
+          V = { x: cen.x + r * d.x, y: cen.y + r * d.y };
+        }
+        var ns = { B: s.B, C: s.C, D: s.D };
+        if (idx === 0) ns.B = V; else if (idx === 1) ns.C = V; else ns.D = V;
+        return ns;
+      },
+      coded: function (P) { return { m: '', l: '' }; },
+      raEach: true
+    };
+  };
 
   // ================================================================= builder
+  // config = objet {..} OU chaine "type=rtri;ra=3;ask=carre;verdict=false" (pratique en WIMS : pas d'accolades)
+  function parseCfg(str) { var o = {}; str.split(';').forEach(function (kv) { var i = kv.indexOf('='); if (i < 0) return;
+    var k = kv.slice(0, i).trim(), v = kv.slice(i + 1).trim();
+    if (v === 'true') v = true; else if (v === 'false') v = false; else if (v !== '' && v == +v) v = +v; o[k] = v; }); return o; }
   window.G6quad = function (id, cfg) {
     inject();
     var box = (typeof id === 'string') ? document.getElementById(id) : id; if (!box) return;
+    if (typeof cfg === 'string') cfg = parseCfg(cfg);
     var ask = cfg.ask || 'rectangle', showV = cfg.verdict !== false, showH = cfg.hint !== false;
     var M = (MODES[cfg.type] || MODES.para)(cfg);
     box.innerHTML = shell(showV, showH, M.hint);
@@ -208,7 +240,8 @@
       vtx.innerHTML = verts(P);
       var cc = M.coded(P); cod.innerHTML = cc.m; lab.innerHTML = cc.l;
       var c = classify(P), vis = '';
-      if (c.isRect) vis += greenRA(P); if (ask === 'losange' && c.isRhombus && !c.isRect) vis += greenTk(P);
+      if (M.raEach) { if (convex(P)) for (var j = 0; j < 4; j++) if (Math.abs(angAt(P, j) - 90) < 4) vis += raMk(P, j, GRN); }
+      else { if (c.isRect) vis += greenRA(P); if (ask === 'losange' && c.isRhombus && !c.isRect) vis += greenTk(P); }
       ra.innerHTML = vis;
       pins.innerHTML = M.pins(P).map(function (p) { return '<circle class="g6q-pin" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="9.5" fill="' + OR + '" stroke="#f7f6f3" stroke-width="2.5" tabindex="0"></circle>'; }).join('');
       if (vbox) { var v = verdict(ask, c); vbox.className = 'g6q-v' + (v[0] ? ' ' + v[0] : ''); vt.textContent = v[1]; }
