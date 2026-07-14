@@ -114,14 +114,16 @@
       };
     },
     rtri: function (cfg) {
-      var ra3 = (cfg.ra === 3), bx0 = 112, bx1 = 268, by = 210, base = bx1 - bx0, LOh = 46, HIh = 178;
+      var ra3 = (cfg.ra === 3), one = cfg.one, bx0 = 112, bx1 = 268, by = 210, base = bx1 - bx0, LOh = 46, HIh = 178;
       return {
-        hint: ra3 ? 'Fais glisser le <b style="color:#ea7317">point orange</b> : les angles droits codés restent vrais, seule la <b>hauteur</b> change.'
+        hint: one ? 'Deux angles droits sont fixés (en A et B). Déplace le <b style="color:#ea7317">point orange</b> pour amener le 3<sup>e</sup> angle à l\'angle droit — le 4<sup>e</sup> suit-il&#8239;?'
+            : ra3 ? 'Fais glisser le <b style="color:#ea7317">point orange</b> : les angles droits codés restent vrais, seule la <b>hauteur</b> change.'
                   : 'Fais glisser les <b style="color:#ea7317">deux points orange</b> : les deux angles droits codés (en bas) restent toujours vrais.',
-        state: { hD: 150, hC: ra3 ? 150 : 98 },
+        state: { hD: 150, hC: one ? 92 : (ra3 ? 150 : 98) },
         points: function (s) { return [{ x: bx0, y: by }, { x: bx1, y: by }, { x: bx1, y: by - s.hC }, { x: bx0, y: by - s.hD }]; },
-        pins: function (P) { return ra3 ? [P[3]] : [P[3], P[2]]; },
+        pins: function (P) { return one ? [P[2]] : ra3 ? [P[3]] : [P[3], P[2]]; },
         dragPin: function (s, idx, x, y) { var h = Math.max(LOh, Math.min(HIh, by - y)); if (Math.abs(h - base) < 6) h = base;
+          if (one) return { hD: s.hD, hC: (Math.abs(h - s.hD) < 7) ? s.hD : h };
           if (ra3) return { hD: h, hC: h };
           if (idx === 0) return { hD: (Math.abs(h - s.hC) < 7) ? s.hC : h, hC: s.hC };
           return { hD: s.hD, hC: (Math.abs(h - s.hD) < 7) ? s.hD : h }; },
@@ -190,6 +192,30 @@
     }
   };
   MODES.rhomb = function (cfg) { cfg.a = cfg.a || 4; cfg.b = cfg.a; return MODES.para(cfg); };
+  // "pfree" : parallelogramme (cotes opposes egaux, codage a marques) mais le point est
+  // LIBRE en 2D -> l'eleve change les angles ET la longueur des cotes (peut faire losange/rectangle/carre).
+  MODES.pfree = function (cfg) {
+    var A = { x: 110, y: 208 }, B = { x: 250, y: 208 }, L = dist(A, B);
+    return {
+      hint: 'Les <b>côtés opposés</b> gardent toujours la même longueur (marques). Déplace le <b style="color:#ea7317">point orange</b> où tu veux : tu changes les angles ET la longueur des côtés — ils peuvent même devenir tous égaux.',
+      state: { D: { x: 150, y: 108 } },
+      points: function (s) { return [A, B, { x: B.x + (s.D.x - A.x), y: B.y + (s.D.y - A.y) }, s.D]; },
+      pins: function (P) { return [P[3]]; },
+      dragPin: function (s, idx, x, y) {
+        x = Math.max(20, Math.min(360, x)); y = Math.max(24, Math.min(190, y));
+        var D = { x: x, y: y };
+        if (Math.abs(dist(D, A) - L) < 12) { var u = unit(A, D); D = { x: A.x + L * u.x, y: A.y + L * u.y }; }   // aimant losange : AD = AB
+        if (Math.abs(D.x - A.x) < 11) { var ln = dist(D, A); D = { x: A.x, y: (D.y < A.y) ? A.y - ln : A.y + ln }; } // aimant rectangle : AD vertical
+        return { D: D };
+      },
+      coded: function (P) {
+        // codage ADAPTATIF : 4 cotes egaux -> meme marque partout ; sinon 2 paires distinctes
+        if (Math.abs(dist(P[0], P[1]) - dist(P[1], P[2])) < 8)
+          return { m: tick(P, 0, 1, GY) + tick(P, 1, 1, GY) + tick(P, 2, 1, GY) + tick(P, 3, 1, GY), l: '' };
+        return { m: tick(P, 0, 1, GY) + tick(P, 2, 1, GY) + tick(P, 1, 2, GY) + tick(P, 3, 2, GY), l: '' };
+      }
+    };
+  };
   // "freeRA" : quadrilatere libre, A fixe, B/C/D deplacables ; aimant qui ramene un
   // sommet a l'angle droit (cercle de Thales sur ses 2 voisins). Sert a decouvrir que
   // 3 angles droits en forcent un 4e. Marque verte sur CHAQUE sommet a 90 deg.
